@@ -1,0 +1,208 @@
+basePath: /
+host: localhost:8081
+info:
+  contact: {}
+  description: 用户登录、登出与项目管理接口示例
+  title: CodeCampass API 文档
+  version: "1.0"
+paths:
+  /api/createProject:
+    post:
+      parameters:
+      - description: 项目名
+        in: query
+        name: name
+        type: string
+      - description: 项目介绍
+        in: query
+        name: description
+        type: string
+      - description: 仓库网址
+        in: query
+        name: repo_url
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - Bearer: []
+      summary: 创建新项目
+      tags:
+      - 项目模块
+  /api/deleteProject:
+    delete:
+      parameters:
+      - description: 项目名
+        in: query
+        name: name
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - Bearer: []
+      summary: 删除项目
+      tags:
+      - 项目模块
+  /api/getProjectInfo:
+    get:
+      parameters:
+      - description: 项目名
+        in: query
+        name: name
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - Bearer: []
+      summary: 查看项目信息
+      tags:
+      - 项目模块
+  /api/listProjects:
+    get:
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - Bearer: []
+      summary: 列出所有项目
+      tags:
+      - 项目模块
+  /api/updateProject:
+    put:
+      parameters:
+      - description: 原项目名
+        in: query
+        name: pre_name
+        required: true
+        type: string
+      - description: 新项目名
+        in: query
+        name: name
+        type: string
+      - description: 新项目描述
+        in: query
+        name: description
+        type: string
+      - description: 新仓库网址
+        in: query
+        name: repo_url
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - Bearer: []
+      summary: 修改项目
+      tags:
+      - 项目模块
+  /user/createUser:
+    post:
+      parameters:
+      - description: 用户名
+        in: query
+        name: name
+        type: string
+      - description: 密码
+        in: query
+        name: password
+        type: string
+      - description: 确认密码
+        in: query
+        name: repassword
+        type: string
+      responses:
+        "200":
+          description: code","message"}
+          schema:
+            type: string
+      summary: 用户注册
+      tags:
+      - 用户模块
+  /user/deleteUser:
+    post:
+      responses:
+        "200":
+          description: code","message"}
+          schema:
+            type: string
+      security:
+      - Bearer: []
+      summary: 用户注销
+      tags:
+      - 用户模块
+  /user/getUserInfo:
+    get:
+      responses:
+        "200":
+          description: code","message"}
+          schema:
+            type: string
+      security:
+      - Bearer: []
+      summary: 查看当前用户信息
+      tags:
+      - 用户模块
+  /user/getUserList:
+    get:
+      responses:
+        "200":
+          description: code","message"}
+          schema:
+            type: string
+      summary: 查询所有用户
+      tags:
+      - 用户模块
+  /user/userLogin:
+    post:
+      parameters:
+      - description: 用户名
+        in: query
+        name: name
+        type: string
+      - description: 密码
+        in: query
+        name: password
+        type: string
+      responses:
+        "200":
+          description: code","message"}
+          schema:
+            type: string
+      summary: 用户登录
+      tags:
+      - 用户模块
+  /user/userLogout:
+    post:
+      responses:
+        "200":
+          description: code","message"}
+          schema:
+            type: string
+      summary: 用户登出
+      tags:
+      - 用户模块
+securityDefinitions:
+  Bearer:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

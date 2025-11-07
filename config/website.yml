@@ -1,0 +1,8 @@
+mysql:
+  dns: root:771009@tcp(localhost:3306)/codecampass?charset=utf8mb4&parseTime=True&loc=Local
+redis:
+  addr: "localhost:6379"
+  password: ""
+  DB: 0
+  poolSize: 30
+  minIdleConn: 30
