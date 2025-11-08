@@ -3,9 +3,16 @@ package service
 import (
 	"CodeCampass/models"
 	"CodeCampass/utils"
+	"context"
+	"encoding/json"
+	"fmt"
+	"math"
 	"net/http"
+	"os"
+	"sort"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sashabaranov/go-openai"
 )
 
 // CreateProject
@@ -224,4 +231,128 @@ func GetProjectInfo(c *gin.Context) {
 		"message": "查看成功",
 		"data":    project,
 	})
+}
+
+// AskProject
+// @Summary LLM代码问答
+// @Tags 项目模块
+// @Security Bearer
+// @Param name query string  true "项目名"
+// @Param question query string true "用户问题"
+// @Success 200 {object} map[string]string "answer"
+// @Router /api/askProject [post]
+func AskProject(c *gin.Context) {
+	name := c.Query("name")
+	question := c.Query("question")
+
+	// 从中间件中取出当前登录用户ID
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "用户未登录"})
+		return
+	}
+
+	// 查找项目
+	var proj models.Project
+	if err := utils.DB.Where("owner_id = ? and name = ?", userID, name).First(&proj).Error; err != nil {
+		c.JSON(404, gin.H{"error": "项目不存在"})
+		return
+	}
+
+	apiKey := os.Getenv("OPENAI_API_KEY")
+	if apiKey == "" {
+		c.JSON(500, gin.H{"error": "请先设置 OPENAI_API_KEY 环境变量"})
+		return
+	}
+
+	// 配置 ChatAnywhere
+	cfg := openai.DefaultConfig(apiKey)
+	//cfg.BaseURL = "https://api.chatanywhere.tech" // 国内首选
+	cfg.BaseURL = "https://api.chatanywhere.org" // 国外使用
+	client := openai.NewClientWithConfig(cfg)
+
+	// 生成问题 embedding
+	embResp, err := client.CreateEmbeddings(context.Background(), openai.EmbeddingRequest{
+		Model: openai.SmallEmbedding3,
+		Input: []string{question},
+	})
+	if err != nil {
+		c.JSON(500, gin.H{"error": "embedding生成失败"})
+		return
+	}
+	questionVec := embResp.Data[0].Embedding
+
+	// 查询项目所有文件 embedding
+	var all []models.ProjectEmbedding
+	utils.DB.Where("project_id = ?", proj.ID).Find(&all)
+
+	type ScoredChunk struct {
+		Path    string
+		Content string
+		Score   float64
+	}
+
+	var topChunks []ScoredChunk
+	for _, e := range all {
+		// JSON 反序列化 embedding
+		var emb []float32
+		if err := json.Unmarshal([]byte(e.Embedding), &emb); err != nil {
+			fmt.Println("embedding解析失败:", e.FilePath, err)
+			continue
+		}
+		score := cosineSimilarity(emb, questionVec)
+		topChunks = append(topChunks, ScoredChunk{
+			Path:    e.FilePath,
+			Content: e.Content,
+			Score:   score,
+		})
+	}
+
+	// 取前三个最相关片段
+	sort.Slice(topChunks, func(i, j int) bool { return topChunks[i].Score > topChunks[j].Score })
+	if len(topChunks) > 3 {
+		topChunks = topChunks[:3]
+	}
+
+	// 拼接上下文
+	var contextText string
+	for _, chunk := range topChunks {
+		contextText += fmt.Sprintf("\n[文件: %s]\n%s\n", chunk.Path, chunk.Content)
+	}
+
+	prompt := fmt.Sprintf(`你是一名代码分析专家，请基于以下仓库内容回答问题：
+%s
+
+问题：%s`, contextText, question)
+
+	// 调用 LLM
+	chatResp, err := client.CreateChatCompletion(context.Background(), openai.ChatCompletionRequest{
+		Model: openai.GPT4oMini,
+		Messages: []openai.ChatCompletionMessage{
+			{Role: "system", Content: "你是代码与软件架构专家。"},
+			{Role: "user", Content: prompt},
+		},
+	})
+	if err != nil {
+		c.JSON(500, gin.H{"error": fmt.Sprintf("LLM调用失败: %v", err)})
+		return
+	}
+
+	c.JSON(200, gin.H{"answer": chatResp.Choices[0].Message.Content})
+}
+
+func cosineSimilarity(a, b []float32) float64 {
+	if len(a) != len(b) {
+		return 0
+	}
+	var dot, normA, normB float64
+	for i := range a {
+		dot += float64(a[i] * b[i])
+		normA += float64(a[i] * a[i])
+		normB += float64(b[i] * b[i])
+	}
+	if normA == 0 || normB == 0 {
+		return 0
+	}
+	return dot / (math.Sqrt(normA) * math.Sqrt(normB))
 }

@@ -40,6 +40,8 @@ func Router() *gin.Engine {
 		api.PUT("/updateProject", service.UpdateProject)
 		api.DELETE("/deleteProject", service.DeleteProject)
 		api.GET("/getProjectInfo", service.GetProjectInfo)
+		api.POST("/importProjectRepo", service.ImportProjectRepo)
+		api.POST("/askProject", service.AskProject)
 	}
 	return r
 }

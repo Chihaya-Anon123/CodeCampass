@@ -19,7 +19,7 @@ import (
 func main() {
 	utils.InitConfig()
 	utils.InitMySQL()
-	utils.DB.AutoMigrate(&models.UserBasic{}, &models.Project{})
+	utils.DB.AutoMigrate(&models.UserBasic{}, &models.Project{}, &models.Repo{}, &models.ProjectEmbedding{})
 	utils.InitRedis()
 	r := router.Router()
 	r.Run(":8081") //listen on "localhost:8081"

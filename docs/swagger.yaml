@@ -6,6 +6,31 @@ info:
   title: CodeCampass API 文档
   version: "1.0"
 paths:
+  /api/askProject:
+    post:
+      parameters:
+      - description: 项目名
+        in: query
+        name: name
+        required: true
+        type: string
+      - description: 用户问题
+        in: query
+        name: question
+        required: true
+        type: string
+      responses:
+        "200":
+          description: answer
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - Bearer: []
+      summary: LLM代码问答
+      tags:
+      - 项目模块
   /api/createProject:
     post:
       parameters:
@@ -68,6 +93,25 @@ paths:
       security:
       - Bearer: []
       summary: 查看项目信息
+      tags:
+      - 项目模块
+  /api/importProjectRepo:
+    post:
+      parameters:
+      - description: 项目名
+        in: query
+        name: name
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - Bearer: []
+      summary: 导入项目仓库
       tags:
       - 项目模块
   /api/listProjects:
