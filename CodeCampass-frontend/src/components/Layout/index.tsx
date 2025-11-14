@@ -7,12 +7,14 @@ import {
   UserOutlined,
   LogoutOutlined,
   SettingOutlined,
+  KeyOutlined,
 } from '@ant-design/icons';
 import { useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { authApi } from '@/api/auth';
 import ProjectSidebar from './ProjectSidebar';
 import TopBar from './TopBar';
+import ApiKeyModal from './ApiKeyModal';
 import './index.css';
 
 const { Header, Sider, Content } = AntLayout;
@@ -20,6 +22,7 @@ const { Header, Sider, Content } = AntLayout;
 const Layout: React.FC = () => {
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
+  const [apiKeyModalOpen, setApiKeyModalOpen] = useState(false);
   const { user, logout: logoutStore } = useAuthStore();
 
   const handleLogout = async () => {
@@ -42,6 +45,14 @@ const Layout: React.FC = () => {
       label: '个人信息',
       onClick: () => {
         // TODO: 跳转到个人信息页
+      },
+    },
+    {
+      key: 'apiKey',
+      icon: <KeyOutlined />,
+      label: 'API Key 设置',
+      onClick: () => {
+        setApiKeyModalOpen(true);
       },
     },
     {
@@ -84,7 +95,7 @@ const Layout: React.FC = () => {
               onClick={() => setCollapsed(!collapsed)}
               className="mr-4"
             />
-            <TopBar />
+            <TopBar onApiKeyClick={() => setApiKeyModalOpen(true)} />
           </div>
           <div className="flex items-center">
             <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
@@ -103,6 +114,10 @@ const Layout: React.FC = () => {
           <Outlet />
         </Content>
       </AntLayout>
+      <ApiKeyModal
+        open={apiKeyModalOpen}
+        onCancel={() => setApiKeyModalOpen(false)}
+      />
     </AntLayout>
   );
 };

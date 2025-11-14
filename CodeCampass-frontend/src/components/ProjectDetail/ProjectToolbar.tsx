@@ -27,12 +27,14 @@ const ProjectToolbar: React.FC<ProjectToolbarProps> = ({ project }) => {
       if (response.code === 0 || response.message) {
         message.success(response.message || '仓库同步成功');
         queryClient.invalidateQueries({ queryKey: ['project', project.name] });
+        // 刷新文件树
+        queryClient.invalidateQueries({ queryKey: ['projectFiles', project.name] });
       } else {
         message.error(response.message || '同步失败');
       }
     },
     onError: (error: any) => {
-      const errorMessage = error.response?.data?.message || error.message || '同步失败';
+      const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || '同步失败';
       message.error(errorMessage);
     },
   });

@@ -44,8 +44,8 @@ func ImportProjectRepo(c *gin.Context) {
 		return
 	}
 
-	// 目标路径：云主机上存储的仓库目录
-	baseDir := fmt.Sprintf("E:/Repos/%d/%d", proj.OwnerId, proj.ID)
+	// 目标路径：存储在 ubuntu 用户目录下的 Repos 文件夹
+	baseDir := fmt.Sprintf("/home/ubuntu/Repos/%d/%d", proj.OwnerId, proj.ID)
 	os.MkdirAll(baseDir, 0755)
 
 	// 如果之前存在仓库则先删除（可选）
@@ -90,24 +90,38 @@ func ImportProjectRepo(c *gin.Context) {
 		return nil
 	})
 
+	// 尝试构建 embedding（如果未设置 API Key，跳过）
 	err := BuildProjectEmbedding(utils.DB, proj.ID, baseDir)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": err,
-		})
+		// embedding 构建失败不影响整体导入，记录警告即可
+		fmt.Printf("警告: 构建 embedding 失败: %v\n", err)
 	}
 
 	c.JSON(200, gin.H{
+		"code":    0,
 		"message": "导入完成，仓库已保存至云主机",
 		"path":    baseDir,
 	})
 }
 
 func BuildProjectEmbedding(db *gorm.DB, projectID uint, basePath string) error {
-	apiKey := os.Getenv("OPENAI_API_KEY")
+	// 获取项目所有者ID
+	var proj models.Project
+	if err := db.Where("id = ?", projectID).First(&proj).Error; err != nil {
+		return fmt.Errorf("项目不存在")
+	}
+
+	// 从 Redis 获取用户的 API Key
+	apiKey := utils.Red.Get(utils.Red.Context(), fmt.Sprintf("openai_key:%d", proj.OwnerId)).Val()
+	
+	// 如果 Redis 中没有，从环境变量获取（向后兼容）
 	if apiKey == "" {
-		fmt.Println("请先设置 OPENAI_API_KEY 环境变量")
-		return exec.ErrNotFound
+		apiKey = os.Getenv("OPENAI_API_KEY")
+	}
+
+	if apiKey == "" {
+		fmt.Println("警告: 未设置 OPENAI_API_KEY，跳过 embedding 构建")
+		return fmt.Errorf("OPENAI_API_KEY 未设置")
 	}
 
 	// 使用 Config 配置 BaseURL

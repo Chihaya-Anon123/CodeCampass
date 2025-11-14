@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Tree, Spin, Empty, message } from 'antd';
 import type { DataNode } from 'antd/es/tree';
 import { FileTextOutlined, FolderOutlined, FolderOpenOutlined } from '@ant-design/icons';
 import { PrismAsync as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/cjs/styles/prism';
+import { useQuery } from '@tanstack/react-query';
+import { projectApi } from '@/api/project';
 import './CodeViewer.css';
 
 interface CodeViewerProps {
@@ -11,17 +13,35 @@ interface CodeViewerProps {
 }
 
 const CodeViewer: React.FC<CodeViewerProps> = ({ projectName }) => {
-  const [fileTree, setFileTree] = useState<DataNode[]>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [expandedKeys, setExpandedKeys] = useState<React.Key[]>([]);
 
-  useEffect(() => {
-    // TODO: 从后端获取文件树
-    // 暂时使用空数组
-    setFileTree([]);
-  }, [projectName]);
+  // 获取文件树
+  const { data: filesData, isLoading: filesLoading } = useQuery({
+    queryKey: ['projectFiles', projectName],
+    queryFn: async () => {
+      const response = await projectApi.getProjectFiles(decodeURIComponent(projectName));
+      if (response.code === 0 && response.data) {
+        return convertToTreeData(response.data);
+      }
+      return [];
+    },
+    enabled: !!projectName,
+    refetchOnWindowFocus: false,
+  });
+
+  // 转换后端数据格式为 Ant Design Tree 格式
+  const convertToTreeData = (files: any[]): DataNode[] => {
+    if (!Array.isArray(files)) return [];
+    return files.map((file: any) => ({
+      title: file.title,
+      key: file.key,
+      isLeaf: file.isLeaf,
+      children: file.children ? convertToTreeData(file.children) : undefined,
+    }));
+  };
 
   const handleSelect = async (selectedKeys: React.Key[]) => {
     if (selectedKeys.length === 0) {
@@ -31,7 +51,7 @@ const CodeViewer: React.FC<CodeViewerProps> = ({ projectName }) => {
     }
 
     const key = selectedKeys[0] as string;
-    const node = findNode(fileTree, key);
+    const node = findNode(filesData || [], key);
 
     if (node && !node.isLeaf) {
       // 如果是目录，展开/收起
@@ -46,12 +66,16 @@ const CodeViewer: React.FC<CodeViewerProps> = ({ projectName }) => {
     setSelectedFile(key);
     setLoading(true);
     try {
-      // TODO: 从后端获取文件内容
-      // const content = await getFileContent(projectName, key);
-      // setFileContent(content);
-      setFileContent(`// 文件: ${key}\n// TODO: 从后端获取文件内容`);
+      // 从后端获取文件内容
+      const response = await projectApi.getFileContent(decodeURIComponent(projectName), key);
+      if (response.code === 0 && response.data) {
+        setFileContent(response.data.content);
+      } else {
+        message.error('获取文件内容失败');
+        setFileContent('');
+      }
     } catch (error: any) {
-      message.error('获取文件内容失败');
+      message.error(error.response?.data?.error || error.message || '获取文件内容失败');
       setFileContent('');
     } finally {
       setLoading(false);
@@ -113,9 +137,13 @@ const CodeViewer: React.FC<CodeViewerProps> = ({ projectName }) => {
           <div className="p-2 border-b border-gray-200 bg-gray-50">
             <h3 className="text-sm font-semibold text-gray-700">文件目录</h3>
           </div>
-          {fileTree.length > 0 ? (
+          {filesLoading ? (
+            <div className="p-4">
+              <Spin tip="加载文件树中..." />
+            </div>
+          ) : filesData && filesData.length > 0 ? (
             <Tree
-              treeData={fileTree}
+              treeData={filesData}
               defaultExpandAll={false}
               expandedKeys={expandedKeys}
               onExpand={setExpandedKeys}

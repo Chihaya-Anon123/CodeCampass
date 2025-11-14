@@ -54,5 +54,25 @@ export const projectApi = {
         data: { answer: response.answer || response.message || '' },
       };
     }),
+
+  // 获取项目文件树
+  getProjectFiles: (name: string): Promise<ApiResponse<any[]>> =>
+    api.get('/api/getProjectFiles', { params: { name } }).then((response: any) => {
+      return {
+        code: response.code || 0,
+        message: response.message || '',
+        data: response.data || response.files || [],
+      };
+    }),
+
+  // 获取文件内容
+  getFileContent: (name: string, path: string): Promise<ApiResponse<{ content: string; path: string }>> =>
+    api.get('/api/getFileContent', { params: { name, path } }).then((response: any) => {
+      return {
+        code: response.code || 0,
+        message: response.message || '',
+        data: response.data || { content: response.content || '', path: response.path || path },
+      };
+    }),
 };
 

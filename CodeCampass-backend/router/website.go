@@ -42,6 +42,11 @@ func Router() *gin.Engine {
 		api.GET("/getProjectInfo", service.GetProjectInfo)
 		api.POST("/importProjectRepo", service.ImportProjectRepo)
 		api.POST("/askProject", service.AskProject)
+		api.GET("/getProjectFiles", service.GetProjectFiles)
+		api.GET("/getFileContent", service.GetFileContent)
+		api.GET("/getOpenAIKey", service.GetOpenAIKey)
+		api.POST("/setOpenAIKey", service.SetOpenAIKey)
+		api.DELETE("/deleteOpenAIKey", service.DeleteOpenAIKey)
 	}
 	return r
 }

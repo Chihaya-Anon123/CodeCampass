@@ -1,19 +1,35 @@
 import { Button, Space } from 'antd';
-import { SyncOutlined, SettingOutlined } from '@ant-design/icons';
+import { SyncOutlined, SettingOutlined, KeyOutlined } from '@ant-design/icons';
+import { useQueryClient } from '@tanstack/react-query';
 
-const TopBar: React.FC = () => {
+interface TopBarProps {
+  onApiKeyClick?: () => void;
+}
+
+const TopBar: React.FC<TopBarProps> = ({ onApiKeyClick }) => {
+  const queryClient = useQueryClient();
+
   return (
     <Space>
       <Button
         type="text"
         icon={<SyncOutlined />}
         onClick={() => {
-          // TODO: 刷新项目列表
-          window.location.reload();
+          queryClient.invalidateQueries({ queryKey: ['projects'] });
+          queryClient.invalidateQueries({ queryKey: ['projectFiles'] });
         }}
       >
         刷新
       </Button>
+      {onApiKeyClick && (
+        <Button
+          type="text"
+          icon={<KeyOutlined />}
+          onClick={onApiKeyClick}
+        >
+          API Key
+        </Button>
+      )}
       <Button
         type="text"
         icon={<SettingOutlined />}
