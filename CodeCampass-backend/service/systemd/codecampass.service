@@ -1,0 +1,17 @@
+[Unit]
+Description=CodeCampass Backend Service
+After=network.target mysql.service redis.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/CodeCampass/CodeCampass-backend
+ExecStart=/usr/local/go/bin/go run main.go
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+
