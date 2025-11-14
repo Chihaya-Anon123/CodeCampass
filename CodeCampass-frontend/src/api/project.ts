@@ -41,9 +41,12 @@ export const projectApi = {
   deleteProject: (name: string): Promise<ApiResponse> =>
     api.delete('/api/deleteProject', { params: { name } }),
 
-  // 导入项目仓库
+  // 导入项目仓库（显式设置超时为15分钟）
   importProjectRepo: (name: string): Promise<ApiResponse> =>
-    api.post('/api/importProjectRepo', null, { params: { name } }),
+    api.post('/api/importProjectRepo', null, { 
+      params: { name },
+      timeout: 900000, // 15分钟超时
+    }),
 
   // 项目问答
   askProject: (params: AskProjectParams): Promise<ApiResponse<{ answer: string }>> =>

@@ -90,16 +90,46 @@ func ImportProjectRepo(c *gin.Context) {
 		return nil
 	})
 
-	// 尝试构建 embedding（如果未设置 API Key，跳过）
-	err := BuildProjectEmbedding(utils.DB, proj.ID, baseDir)
-	if err != nil {
-		// embedding 构建失败不影响整体导入，记录警告即可
-		fmt.Printf("警告: 构建 embedding 失败: %v\n", err)
-	}
+	// 异步构建 embedding（不阻塞响应）
+	go func() {
+		// 发送开始构建事件
+		GetSSEManager().Publish(proj.ID, SSEEvent{
+			Event: "embedding_start",
+			Data: gin.H{
+				"message":   "开始构建 embedding",
+				"project_id": proj.ID,
+			},
+		})
+
+		err := BuildProjectEmbedding(utils.DB, proj.ID, baseDir)
+		if err != nil {
+			// embedding 构建失败不影响整体导入，记录警告即可
+			fmt.Printf("警告: 构建 embedding 失败: %v\n", err)
+			// 发送失败事件
+			GetSSEManager().Publish(proj.ID, SSEEvent{
+				Event: "embedding_error",
+				Data: gin.H{
+					"message":   fmt.Sprintf("构建 embedding 失败: %v", err),
+					"project_id": proj.ID,
+					"error":     err.Error(),
+				},
+			})
+		} else {
+			fmt.Printf("项目 %d 的 embedding 构建完成\n", proj.ID)
+			// 发送完成事件
+			GetSSEManager().Publish(proj.ID, SSEEvent{
+				Event: "embedding_complete",
+				Data: gin.H{
+					"message":   "Embedding 构建完成",
+					"project_id": proj.ID,
+				},
+			})
+		}
+	}()
 
 	c.JSON(200, gin.H{
 		"code":    0,
-		"message": "导入完成，仓库已保存至云主机",
+		"message": "导入完成，仓库已保存至云主机，embedding 正在后台构建",
 		"path":    baseDir,
 	})
 }

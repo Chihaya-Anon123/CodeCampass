@@ -47,6 +47,7 @@ func Router() *gin.Engine {
 		api.GET("/getOpenAIKey", service.GetOpenAIKey)
 		api.POST("/setOpenAIKey", service.SetOpenAIKey)
 		api.DELETE("/deleteOpenAIKey", service.DeleteOpenAIKey)
+		api.GET("/subscribeProjectEvents", service.SubscribeProjectEvents)
 	}
 	return r
 }

@@ -114,3 +114,6 @@ nohup go run main.go > /tmp/codecampass-backend.log 2>&1 &
 
 现在可以正常使用仓库同步功能了！
 
+
+
+

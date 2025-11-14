@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button, Space, Modal, Form, Input, message } from 'antd';
 import {
   SyncOutlined,
@@ -19,6 +19,80 @@ const ProjectToolbar: React.FC<ProjectToolbarProps> = ({ project }) => {
   const [form] = Form.useForm();
   const queryClient = useQueryClient();
   const { updateProject } = useProjectStore();
+  const eventSourceRef = useRef<EventSource | null>(null);
+  const [isListeningEmbedding, setIsListeningEmbedding] = useState(false);
+
+  // 建立SSE连接监听embedding事件
+  const startListeningEmbedding = (projectId: number) => {
+    // 如果已有连接，先关闭
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+    }
+
+    setIsListeningEmbedding(true);
+    const token = localStorage.getItem('token');
+    const baseURL = import.meta.env.PROD 
+      ? '' 
+      : (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081');
+    
+    // EventSource不支持自定义header，所以通过URL参数传递token
+    const url = `${baseURL}/api/subscribeProjectEvents?project_id=${projectId}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
+    const eventSource = new EventSource(url, {
+      withCredentials: false,
+    });
+
+    eventSource.onopen = () => {
+      console.log('SSE连接已建立');
+    };
+
+    eventSource.addEventListener('connected', (e: any) => {
+      console.log('SSE连接成功:', e.data);
+    });
+
+    eventSource.addEventListener('embedding_start', (e: any) => {
+      const data = JSON.parse(e.data);
+      message.info(data.message || '开始构建 embedding');
+    });
+
+    eventSource.addEventListener('embedding_complete', (e: any) => {
+      const data = JSON.parse(e.data);
+      message.success(data.message || 'Embedding 构建完成');
+      setIsListeningEmbedding(false);
+      eventSource.close();
+      eventSourceRef.current = null;
+      // 刷新项目数据
+      queryClient.invalidateQueries({ queryKey: ['project', project.name] });
+    });
+
+    eventSource.addEventListener('embedding_error', (e: any) => {
+      const data = JSON.parse(e.data);
+      message.warning(data.message || 'Embedding 构建失败');
+      setIsListeningEmbedding(false);
+      eventSource.close();
+      eventSourceRef.current = null;
+    });
+
+    eventSource.onerror = (error) => {
+      console.error('SSE连接错误:', error);
+      // 如果连接关闭，停止监听
+      if (eventSource.readyState === EventSource.CLOSED) {
+        setIsListeningEmbedding(false);
+        eventSourceRef.current = null;
+      }
+    };
+
+    eventSourceRef.current = eventSource;
+  };
+
+  // 清理SSE连接
+  useEffect(() => {
+    return () => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+    };
+  }, []);
 
   // 同步仓库
   const syncMutation = useMutation({
@@ -29,6 +103,11 @@ const ProjectToolbar: React.FC<ProjectToolbarProps> = ({ project }) => {
         queryClient.invalidateQueries({ queryKey: ['project', project.name] });
         // 刷新文件树
         queryClient.invalidateQueries({ queryKey: ['projectFiles', project.name] });
+        
+        // 开始监听embedding构建事件
+        if (project.id) {
+          startListeningEmbedding(project.id);
+        }
       } else {
         message.error(response.message || '同步失败');
       }
@@ -103,10 +182,10 @@ const ProjectToolbar: React.FC<ProjectToolbarProps> = ({ project }) => {
       <Space>
         <Button
           icon={<SyncOutlined />}
-          loading={syncMutation.isPending}
+          loading={syncMutation.isPending || isListeningEmbedding}
           onClick={handleSync}
         >
-          同步仓库
+          {isListeningEmbedding ? '构建中...' : '同步仓库'}
         </Button>
         <Button
           icon={<ReloadOutlined />}

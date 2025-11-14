@@ -8,7 +8,7 @@ const baseURL = import.meta.env.PROD
 
 const api = axios.create({
   baseURL,
-  timeout: 30000,
+  timeout: 900000, // 15分钟超时，足够处理大型仓库的克隆和索引建立
 });
 
 // 请求拦截器
