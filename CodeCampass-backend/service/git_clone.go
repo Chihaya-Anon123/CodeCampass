@@ -44,8 +44,8 @@ func ImportProjectRepo(c *gin.Context) {
 		return
 	}
 
-	// 目标路径：云主机上存储的仓库目录
-	baseDir := fmt.Sprintf("E:/Repos/%d/%d", proj.OwnerId, proj.ID)
+	// 目标路径：存储在 ubuntu 用户目录下的 Repos 文件夹
+	baseDir := fmt.Sprintf("/home/ubuntu/Repos/%d/%d", proj.OwnerId, proj.ID)
 	os.MkdirAll(baseDir, 0755)
 
 	// 如果之前存在仓库则先删除（可选）
@@ -90,24 +90,68 @@ func ImportProjectRepo(c *gin.Context) {
 		return nil
 	})
 
-	err := BuildProjectEmbedding(utils.DB, proj.ID, baseDir)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": err,
+	// 异步构建 embedding（不阻塞响应）
+	go func() {
+		// 发送开始构建事件
+		GetSSEManager().Publish(proj.ID, SSEEvent{
+			Event: "embedding_start",
+			Data: gin.H{
+				"message":   "开始构建 embedding",
+				"project_id": proj.ID,
+			},
 		})
-	}
+
+		err := BuildProjectEmbedding(utils.DB, proj.ID, baseDir)
+		if err != nil {
+			// embedding 构建失败不影响整体导入，记录警告即可
+			fmt.Printf("警告: 构建 embedding 失败: %v\n", err)
+			// 发送失败事件
+			GetSSEManager().Publish(proj.ID, SSEEvent{
+				Event: "embedding_error",
+				Data: gin.H{
+					"message":   fmt.Sprintf("构建 embedding 失败: %v", err),
+					"project_id": proj.ID,
+					"error":     err.Error(),
+				},
+			})
+		} else {
+			fmt.Printf("项目 %d 的 embedding 构建完成\n", proj.ID)
+			// 发送完成事件
+			GetSSEManager().Publish(proj.ID, SSEEvent{
+				Event: "embedding_complete",
+				Data: gin.H{
+					"message":   "Embedding 构建完成",
+					"project_id": proj.ID,
+				},
+			})
+		}
+	}()
 
 	c.JSON(200, gin.H{
-		"message": "导入完成，仓库已保存至云主机",
+		"code":    0,
+		"message": "导入完成，仓库已保存至云主机，embedding 正在后台构建",
 		"path":    baseDir,
 	})
 }
 
 func BuildProjectEmbedding(db *gorm.DB, projectID uint, basePath string) error {
-	apiKey := os.Getenv("OPENAI_API_KEY")
+	// 获取项目所有者ID
+	var proj models.Project
+	if err := db.Where("id = ?", projectID).First(&proj).Error; err != nil {
+		return fmt.Errorf("项目不存在")
+	}
+
+	// 从 Redis 获取用户的 API Key
+	apiKey := utils.Red.Get(utils.Red.Context(), fmt.Sprintf("openai_key:%d", proj.OwnerId)).Val()
+	
+	// 如果 Redis 中没有，从环境变量获取（向后兼容）
 	if apiKey == "" {
-		fmt.Println("请先设置 OPENAI_API_KEY 环境变量")
-		return exec.ErrNotFound
+		apiKey = os.Getenv("OPENAI_API_KEY")
+	}
+
+	if apiKey == "" {
+		fmt.Println("警告: 未设置 OPENAI_API_KEY，跳过 embedding 构建")
+		return fmt.Errorf("OPENAI_API_KEY 未设置")
 	}
 
 	// 使用 Config 配置 BaseURL

@@ -259,9 +259,16 @@ func AskProject(c *gin.Context) {
 		return
 	}
 
-	apiKey := os.Getenv("OPENAI_API_KEY")
+	// 从 Redis 获取用户的 API Key
+	apiKey := utils.Red.Get(utils.Red.Context(), fmt.Sprintf("openai_key:%d", userID)).Val()
+	
+	// 如果 Redis 中没有，从环境变量获取（向后兼容）
 	if apiKey == "" {
-		c.JSON(500, gin.H{"error": "请先设置 OPENAI_API_KEY 环境变量"})
+		apiKey = os.Getenv("OPENAI_API_KEY")
+	}
+
+	if apiKey == "" {
+		c.JSON(500, gin.H{"error": "请先设置 OpenAI API Key"})
 		return
 	}
 
